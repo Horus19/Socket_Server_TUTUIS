@@ -38,6 +38,6 @@ COPY --from=builder /app/dist ./dist
 # RUN chown -R pokeuser:pokeuser ./pokedex
 # USER pokeuser
 
-# EXPOSE 3000
+EXPOSE 3003
 
 CMD [ "node","dist/main" ]

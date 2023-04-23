@@ -1,11 +1,19 @@
-import { WebSocketGateway, SubscribeMessage, MessageBody, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+} from '@nestjs/websockets';
 import { MessagesWsService } from './messages-ws.service';
 import { CreateMessagesWDto } from './dto/create-messages-w.dto';
 import { UpdateMessagesWDto } from './dto/update-messages-w.dto';
 import { Socket } from 'socket.io';
 
-@WebSocketGateway({cors: true})
-export class MessagesWsGateway implements OnGatewayConnection, OnGatewayDisconnect {
+@WebSocketGateway({ cors: true })
+export class MessagesWsGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   constructor(private readonly messagesWsService: MessagesWsService) {}
 
   handleConnection(client: Socket, ...args: any[]) {
@@ -32,7 +40,10 @@ export class MessagesWsGateway implements OnGatewayConnection, OnGatewayDisconne
 
   @SubscribeMessage('updateMessagesW')
   update(@MessageBody() updateMessagesWDto: UpdateMessagesWDto) {
-    return this.messagesWsService.update(updateMessagesWDto.id, updateMessagesWDto);
+    return this.messagesWsService.update(
+      updateMessagesWDto.id,
+      updateMessagesWDto,
+    );
   }
 
   @SubscribeMessage('removeMessagesW')
