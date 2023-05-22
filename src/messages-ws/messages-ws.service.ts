@@ -6,6 +6,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Mensaje } from './entities/mensaje.entity';
 import { Repository } from 'typeorm';
 import { AuthService } from '../auth/auth.service';
+import { mensajeDto } from "./dto/mensaje.dto";
 
 @Injectable()
 export class MessagesWsService {
@@ -48,5 +49,33 @@ export class MessagesWsService {
       mensaje: msg,
     });
     return await this.mensajeRepository.save(newMensaje);
+  }
+
+  /**
+   * @description: obtiene los mensajes de un usuario
+   * @param id
+   */
+  async getMessages(id: string) {
+    const mensajes = await this.mensajeRepository.find({
+      where: [{ remitente: { id } }, { destinatario: { id } }],
+      relations: ['remitente', 'destinatario'],
+      order: { fechaCreacion: 'DESC' },
+    });
+    return this.convertirMensajes(mensajes);
+  }
+
+  /**
+   * @description: Convierte una lista de entidad Mensaje a una lista MensajeDto
+   * @param mensajes
+   */
+  convertirMensajes(mensajes: Mensaje[]) {
+    const mensajesDto = mensajes.map((mensaje) => {
+      const { id, remitente, destinatario, mensaje: text } = mensaje;
+      return {
+        uuid: remitente.id,
+        mensaje: text,
+      };
+    });
+    return mensajesDto;
   }
 }
