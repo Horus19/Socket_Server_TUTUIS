@@ -3,14 +3,14 @@ import {
   SubscribeMessage,
   MessageBody,
   OnGatewayConnection,
-  OnGatewayDisconnect, ConnectedSocket
-} from "@nestjs/websockets";
+  OnGatewayDisconnect,
+  ConnectedSocket,
+} from '@nestjs/websockets';
 import { MessagesWsService } from './messages-ws.service';
-import { CreateMessagesWDto } from './dto/create-messages-w.dto';
-import { UpdateMessagesWDto } from './dto/update-messages-w.dto';
 import { Socket } from 'socket.io';
 import { AuthService } from '../auth/auth.service';
-import { CreateMensajeDto } from "./dto/create-mensaje.dto";
+import { CreateMensajeDto } from './dto/create-mensaje.dto';
+import { RabbitMqService } from '../auth/rabbit-mq/rabbit-mq.service';
 
 @WebSocketGateway({ cors: true })
 export class MessagesWsGateway
@@ -19,7 +19,14 @@ export class MessagesWsGateway
   constructor(
     private readonly messagesWsService: MessagesWsService,
     private readonly authService: AuthService,
-  ) {}
+    private readonly rabbitMqService: RabbitMqService,
+  ) {
+    rabbitMqService.connectToRabbitMQ().then(() => {
+      this.setupSubscribers().then(() => console.log('Subscripto a RabbitMQ'));
+    });
+  }
+
+  client: Socket;
 
   async handleConnection(client: Socket, ...args: any[]) {
     console.log('Cliente conectado', client.id);
@@ -28,39 +35,17 @@ export class MessagesWsGateway
     if (id == null) {
       return client.disconnect();
     }
+    this.client = client;
+
     client.join(id);
     console.log('Cliente conectado', client.id);
+
+    // Join notifications room
+    const notificationsRoom = `notifications:${id}`;
+    client.join(notificationsRoom);
   }
   handleDisconnect(client: Socket) {
     console.log('Cliente desconectado', client.id);
-  }
-
-  @SubscribeMessage('createMessagesW')
-  create(@MessageBody() createMessagesWDto: CreateMessagesWDto) {
-    return this.messagesWsService.create(createMessagesWDto);
-  }
-
-  @SubscribeMessage('findAllMessagesWs')
-  findAll() {
-    return this.messagesWsService.findAll();
-  }
-
-  @SubscribeMessage('findOneMessagesW')
-  findOne(@MessageBody() id: number) {
-    return this.messagesWsService.findOne(id);
-  }
-
-  @SubscribeMessage('updateMessagesW')
-  update(@MessageBody() updateMessagesWDto: UpdateMessagesWDto) {
-    return this.messagesWsService.update(
-      updateMessagesWDto.id,
-      updateMessagesWDto,
-    );
-  }
-
-  @SubscribeMessage('removeMessagesW')
-  remove(@MessageBody() id: number) {
-    return this.messagesWsService.remove(id);
   }
 
   @SubscribeMessage('mensaje-personal')
@@ -70,5 +55,34 @@ export class MessagesWsGateway
   ) {
     this.messagesWsService.createMessage(mensaje);
     client.to(mensaje.para).emit('mensaje-personal', mensaje);
+  }
+
+  async setupSubscribers() {
+    const channel = await this.rabbitMqService.getChannelRef();
+    const exchange = 'user.exchange';
+
+    // Subscriber for send-notification queue
+    const sendNotificationQueue = 'send-notification';
+    const sendNotificationRoutingKey = 'send-notification';
+
+    await channel.assertExchange(exchange, 'direct', { durable: true });
+    await channel.assertQueue(sendNotificationQueue, { durable: true });
+    await channel.bindQueue(
+      sendNotificationQueue,
+      exchange,
+      sendNotificationRoutingKey,
+    );
+
+    await channel.consume(sendNotificationQueue, async (msg) => {
+      const content = msg.content.toString();
+      console.log('Payload recibido:', content);
+      // Realiza las acciones necesarias con el payload recibido
+      const payload = JSON.parse(content);
+      //Envia el mensaje a la sala de notificaciones del usuario
+      const notificationsRoom = `notifications:${payload.to}`;
+      console.log(notificationsRoom);
+      this.client.to(notificationsRoom).emit(notificationsRoom, payload);
+      channel.ack(msg);
+    });
   }
 }

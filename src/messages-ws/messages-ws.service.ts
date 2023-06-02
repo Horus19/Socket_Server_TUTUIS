@@ -52,15 +52,26 @@ export class MessagesWsService {
   }
 
   /**
-   * @description: obtiene los mensajes de un usuario
-   * @param id
+   * @description: obtiene los mensajes de un usuario, ordenados por fecha de creacion
+   * @param usuario
+   * @param remitente
    */
-  async getMessages(id: string) {
-    const mensajes = await this.mensajeRepository.find({
-      where: [{ remitente: { id } }, { destinatario: { id } }],
-      relations: ['remitente', 'destinatario'],
-      order: { fechaCreacion: 'DESC' },
-    });
+  async getMessages(usuario: string, remitente: string) {
+    //Obtiene los mensajes donde id es el destinatario y remitente es el remitente o viceversa
+    const mensajes = await this.mensajeRepository
+      .createQueryBuilder('mensaje')
+      .leftJoinAndSelect('mensaje.remitente', 'remitente')
+      .leftJoinAndSelect('mensaje.destinatario', 'destinatario')
+      .where('remitente.id = :usuario AND destinatario.id = :remitente', {
+        usuario,
+        remitente,
+      })
+      .orWhere('remitente.id = :remitente AND destinatario.id = :usuario', {
+        usuario,
+        remitente,
+      })
+      .orderBy('mensaje.fechaCreacion', 'DESC')
+      .getMany();
     return this.convertirMensajes(mensajes);
   }
 

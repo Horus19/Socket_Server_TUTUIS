@@ -6,10 +6,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { RabbitMqService } from './rabbit-mq/rabbit-mq.service';
 
 @Module({
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, RabbitMqService],
   imports: [
     TypeOrmModule.forFeature([User]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
@@ -22,6 +23,13 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       }),
     }),
   ],
-  exports: [TypeOrmModule, JwtStrategy, PassportModule, JwtModule, AuthService],
+  exports: [
+    TypeOrmModule,
+    JwtStrategy,
+    PassportModule,
+    JwtModule,
+    AuthService,
+    RabbitMqService,
+  ],
 })
 export class AuthModule {}
